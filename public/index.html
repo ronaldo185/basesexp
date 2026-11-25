@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestión de expedientes</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#14213d;--mut:#5d6b82;--line:#dde3ea;--acc:#0f766e;--acc2:#e9f5f3;--bad:#b42318;--side:#14213d;--sideink:#c9d3e3}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1420;--card:#172033;--ink:#e6ecf5;--mut:#93a1b8;--line:#27334a;--acc:#2dd4bf;--acc2:#12312f;--bad:#f87171;--side:#0a0f19;--sideink:#9fb0c9}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh}
+aside{width:220px;background:var(--side);padding:20px 12px;position:sticky;top:0;height:100vh;flex:none}
+aside h1{font:700 17px/1.2 Georgia,serif;color:#fff;margin:0 8px 22px}
+aside button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--sideink);padding:10px 12px;border-radius:6px;font:inherit;cursor:pointer}
+aside button:hover{background:rgba(255,255,255,.07)}aside button.on{background:var(--acc);color:#fff;font-weight:600}
+main{flex:1;padding:26px 30px;min-width:0}h2{font:700 24px Georgia,serif;margin:0 0 18px}h3{margin:0 0 10px;font-size:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:6px;padding:12px 14px}.kpi.warn{border-left-color:#d97706}.kpi b{display:block;font-size:28px}.kpi span{color:var(--mut);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.bar{display:grid;grid-template-columns:110px 1fr 34px;gap:8px;align-items:center;margin:6px 0;font-size:13px}.bar i{display:block;height:14px;background:var(--acc);border-radius:3px;min-width:2px}.bar em{font-style:normal;text-align:right}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}.tabs button{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:20px;cursor:pointer;font:inherit;font-size:13px}.tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.bar2{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+input,select,textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);width:100%}
+.bar2 input,.bar2 select{width:auto}
+.btn{background:var(--acc);color:#fff;border:0;padding:8px 14px;border-radius:6px;cursor:pointer;font:inherit;font-weight:600}.btn.g{background:none;color:var(--ink);border:1px solid var(--line);font-weight:400}.btn.d{background:none;color:var(--bad);border:1px solid var(--bad);font-weight:400}.btn.s{padding:3px 9px;font-size:13px}
+.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--acc2);white-space:nowrap}td.a{white-space:nowrap}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);width:min(560px,94vw);padding:20px}dialog::backdrop{background:rgba(0,0,0,.5)}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 3px}.err{color:var(--bad);margin-top:10px;min-height:18px}
+.mut{color:var(--mut)}code{background:var(--acc2);padding:1px 5px;border-radius:4px;font-size:12.5px}
+#er img{max-width:100%;border:1px solid var(--line);border-radius:6px}
+#toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;display:none}
+@media(max-width:760px){body{display:block}aside{width:auto;height:auto;position:static;display:flex;flex-wrap:wrap;padding:10px}aside h1{width:100%;margin:0 0 6px}aside button{width:auto}main{padding:16px}}
+@media print{aside,.bar2,.tabs,.noprint{display:none!important}main{padding:0}body{display:block}}
+</style></head><body>
+<aside><h1>Gestión de<br>expedientes</h1>
+<button data-v="dash">Panel</button><button data-v="gest">Gestión de datos</button><button data-v="rep">Reportes</button><button data-v="dic">Diccionario de datos</button><button data-v="er">Modelo ER</button></aside>
+<main id="main"></main><div id="toast"></div>
+<dialog id="dlg"><form method="dialog" id="frm"></form></dialog>
+<script>
+const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const api=async(u,o)=>{const r=await fetch(u,o&&{headers:{'Content-Type':'application/json'},...o});const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||r.statusText);return j};
+const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',3000)};
+const TN={expediente:'Expedientes',persona:'Personas',funcionario:'Funcionarios',expediente_persona:'Personas en expediente',asignacion:'Asignaciones',actuacion:'Actuaciones',documento:'Documentos',historial_estado:'Historial de estado',tipo_caso:'Tipos de caso',estado:'Estados',rol_persona:'Roles de persona',tipo_documento:'Tipos de documento'};
+const TD={tipo_caso:'Catálogo de clases de caso.',estado:'Catálogo de estados; es_final marca los que cierran el expediente.',rol_persona:'Papel de una persona en un expediente.',tipo_documento:'Catálogo de clases de documento.',expediente:'Entidad central: cada caso con su código, tipo y estado actual.',persona:'Solicitantes, denunciantes, testigos y demás participantes externos.',funcionario:'Personal interno que gestiona los casos.',expediente_persona:'Asociativa N:M entre expediente y persona, con su rol.',asignacion:'Funcionarios asignados a un expediente; un solo responsable activo por expediente.',documento:'Documentos y archivos de respaldo de un expediente.',actuacion:'Acciones realizadas por un funcionario sobre un expediente.',historial_estado:'Bitácora de cambios de estado; un trigger actualiza el estado del expediente.'};
+let META,LK={},cur='expediente',rows=[],V;
+const tabla=(cols,data,act)=>`<div class="wrap"><table><tr>${cols.map(c=>`<th>${esc(c.l??c)}</th>`).join('')}${act?'<th></th>':''}</tr>${data.length?data.map((r,i)=>`<tr>${cols.map(c=>`<td>${c.f?c.f(r[c.k]):esc(r[c.k??c])}</td>`).join('')}${act?`<td class="a"><button class="btn g s" data-e="${i}">Editar</button> <button class="btn d s" data-x="${i}">Eliminar</button></td>`:''}</tr>`).join(''):`<tr><td colspan="${cols.length+1}" class="mut">Sin registros.</td></tr>`}</table></div>`;
+const csv=(cols,rows,name)=>{const t=[cols,...rows.map(r=>cols.map(c=>r[c]))].map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+t],{type:'text/csv'}));a.download=name+'.csv';a.click()};
+
+async function go(v){V=v;document.querySelectorAll('aside button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));META||=await api('/api/meta');await ({dash,gest,rep,dic,er})[v]()}
+document.querySelector('aside').onclick=e=>e.target.dataset.v&&go(e.target.dataset.v);
+
+// ---------- PANEL
+async function dash(){const d=await api('/api/stats'),k=d.k;
+ const K=[['expedientes','Expedientes'],['abiertos','En trámite'],['sin_responsable','Sin responsable',1],['antiguos','Abiertos hace más de 30 días',1],['prom_cierre','Días promedio de cierre'],['documentos','Documentos']];
+ const PAL=['#0f766e','#2563eb','#d97706','#b42318','#7c3aed','#64748b'];
+ const bars=a=>{const m=Math.max(1,...a.map(x=>x.n));return a.map(x=>`<div class="bar"><span>${esc(x.label)}</span><i style="width:${x.n/m*100}%"></i><em>${x.n}</em></div>`).join('')||'<p class="mut">Sin datos.</p>'};
+ const donut=a=>{const t=a.reduce((s,x)=>s+x.n,0),r=40,C=2*Math.PI*r;let o=0;
+  const seg=a.map((x,i)=>{const l=x.n/(t||1)*C,e=`<circle r="${r}" cx="60" cy="60" fill="none" stroke="${PAL[i%6]}" stroke-width="18" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-o}" transform="rotate(-90 60 60)"/>`;o+=l;return e}).join('');
+  return `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap"><svg viewBox="0 0 120 120" width="150" role="img" aria-label="Expedientes por estado"><circle r="${r}" cx="60" cy="60" fill="none" stroke="var(--line)" stroke-width="18"/>${seg}<text x="60" y="66" text-anchor="middle" font-size="20" font-weight="700" fill="var(--ink)">${t}</text></svg>
+  <div>${a.map((x,i)=>`<div><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${PAL[i%6]}"></span> ${esc(x.label)}: <b>${x.n}</b></div>`).join('')}</div></div>`};
+ const al=d.alertas.map(a=>({codigo:a.codigo,titulo:a.titulo,estado:a.estado,dias:a.dias,motivo:[a.sin_responsable&&'Sin responsable',a.dias>30&&'Más de 30 días'].filter(Boolean).join(', ')}));
+ $('#main').innerHTML=`<div class="bar2" style="justify-content:space-between"><h2 style="margin:0">Panel general</h2><div class="bar2" style="margin:0"><button class="btn" id="nx">Nuevo expediente</button><button class="btn g" id="rf">Actualizar</button></div></div>
+ <p class="mut">Actualizado a las ${new Date().toLocaleTimeString()}</p>
+ <div class="kpis">${K.map(([a,b,w])=>`<div class="kpi ${w&&k[a]>0?'warn':''}"><b>${k[a]??'—'}</b><span>${b}</span></div>`).join('')}</div>
+ <div class="grid"><div class="card"><h3>Por estado</h3>${donut(d.estado)}</div><div class="card"><h3>Por tipo de caso</h3>${bars(d.tipo)}</div>
+ <div class="card"><h3>Aperturas por mes</h3>${bars(d.mes)}</div><div class="card"><h3>Carga activa por funcionario</h3>${bars(d.carga)}</div></div>
+ <div class="card"><h3>Expedientes que requieren atención</h3>${al.length?tabla([{l:'Código',k:'codigo'},{l:'Título',k:'titulo'},{l:'Estado',k:'estado'},{l:'Días abierto',k:'dias'},{l:'Motivo',k:'motivo'}],al)+`<p><button class="btn g s" id="ir">Ir a expedientes</button></p>`:'<p class="mut">Todo en orden: no hay expedientes sin responsable ni con demora.</p>'}</div>
+ <div class="card"><h3>Últimas actuaciones</h3>${tabla([{l:'Expediente',k:'codigo'},{l:'Actuación',k:'titulo'},{l:'Fecha',k:'fecha'},{l:'Funcionario',k:'funcionario'}],d.act)}</div>`;
+ $('#rf').onclick=dash;$('#nx').onclick=async()=>{cur='expediente';await go('gest');form()};if($('#ir'))$('#ir').onclick=()=>{cur='expediente';go('gest')}}
+
+// ---------- GESTIÓN (altas, bajas, modificaciones)
+async function gest(t){cur=typeof t==='string'?t:cur;
+ $('#main').innerHTML=`<h2>Gestión de datos</h2><div class="tabs">${Object.keys(TN).map(k=>`<button data-t="${k}" class="${k===cur?'on':''}">${TN[k]}</button>`).join('')}</div>
+ <div class="bar2"><input id="q" placeholder="Buscar en ${TN[cur].toLowerCase()}…" style="min-width:240px"><button class="btn" id="nuevo">Agregar registro</button></div><div id="tb" class="card"></div>`;
+ $('.tabs').onclick=e=>e.target.dataset.t&&gest(e.target.dataset.t);$('#nuevo').onclick=()=>form();
+ let tm;$('#q').oninput=()=>{clearTimeout(tm);tm=setTimeout(load,250)};
+ LK={};for(const c of META[cur])if(c.fk&&!LK[c.fk.table])LK[c.fk.table]=Object.fromEntries((await api('/api/lookup/'+c.fk.table)).map(x=>[x.id,x.label]));
+ load()}
+async function load(){const m=META[cur];rows=await api(`/api/t/${cur}?q=${encodeURIComponent($('#q').value)}`);
+ const fmt=c=>v=>v==null?'':c.fk?esc(LK[c.fk.table]?.[v]??v):c.type==='boolean'?(v?'Sí':'No'):esc(String(v).slice(0,c.type==='timestamp'?16:120));
+ $('#tb').innerHTML=tabla(m.map(c=>({l:c.name,k:c.name,f:fmt(c)})),rows,1)+`<p class="mut">${rows.length} registro(s) (máx. 500).</p>`;
+ $('#tb').onclick=e=>{const b=e.target;if(b.dataset.e!==undefined)form(rows[b.dataset.e]);if(b.dataset.x!==undefined)del(rows[b.dataset.x])}}
+const pkOf=r=>Object.fromEntries(META[cur].filter(c=>c.pk).map(c=>[c.name,r[c.name]]));
+async function del(r){if(!confirm('¿Eliminar este registro? Esta acción no se puede deshacer.'))return;
+ try{await api(`/api/t/${cur}?pk=${encodeURIComponent(JSON.stringify(pkOf(r)))}`,{method:'DELETE'});toast('Registro eliminado');load()}catch(e){alert(e.message)}}
+function form(r){const m=META[cur],ed=!!r;
+ const inp=c=>{const v=r?.[c.name],id='f_'+c.name,ro=ed&&c.pk?'disabled':'',req=!c.nullable&&!c.def&&!c.identity?'required':'';
+  if(c.fk)return `<select id="${id}" ${ro} ${req}><option value="">— seleccionar —</option>${Object.entries(LK[c.fk.table]).map(([k,l])=>`<option value="${k}" ${String(v)===k?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  if(c.type==='boolean')return `<input type="checkbox" id="${id}" style="width:auto" ${(ed?v:/true/i.test(c.def))?'checked':''}>`;
+  if(c.type==='date')return `<input type="date" id="${id}" ${ro} ${req} value="${v||''}">`;
+  if(c.type==='timestamp')return `<input type="datetime-local" id="${id}" ${req} value="${v?String(v).replace(' ','T').slice(0,16):''}">`;
+  if(c.type==='text')return `<textarea id="${id}" rows="3">${esc(v)}</textarea>`;
+  return `<input id="${id}" ${req} value="${esc(v)}">`};
+ $('#frm').innerHTML=`<h3>${ed?'Editar':'Agregar'} · ${TN[cur]}</h3>${m.filter(c=>!c.identity).map(c=>`<label for="f_${c.name}">${c.name}${c.nullable?'':' *'}</label>${inp(c)}`).join('')}
+ <div class="err" id="err"></div><div class="bar2" style="margin:10px 0 0"><button class="btn" value="x" id="ok">Guardar cambios</button><button class="btn g" value="c" formnovalidate>Cancelar</button></div>`;
+ $('#dlg').showModal();
+ $('#ok').onclick=async e=>{e.preventDefault();if(!$('#frm').reportValidity())return;const data={};
+  for(const c of m){if(c.identity||(ed&&c.pk))continue;const el=$('#f_'+c.name);let v=c.type==='boolean'?el.checked:el.value;if(v===''){if(ed)v=null;else continue}data[c.name]=v}
+  try{await api(`/api/t/${cur}`,{method:ed?'PUT':'POST',body:JSON.stringify(ed?{pk:pkOf(r),data}:data)});$('#dlg').close();toast(ed?'Cambios guardados':'Registro agregado');
+   if(cur==='historial_estado')toast('Estado del expediente actualizado');load()}catch(x){$('#err').textContent=x.message}}}
+
+// ---------- REPORTES
+async function rep(){const L=await api('/api/reports');
+ $('#main').innerHTML=`<h2>Reportes</h2><div class="bar2"><select id="rk">${L.map(x=>`<option value="${x.key}" data-f="${x.f?1:0}">${x.t}</option>`).join('')}</select>
+ <span id="fl">Apertura desde <input type="date" id="d1"> hasta <input type="date" id="d2"></span><button class="btn" id="gen">Generar</button>
+ <button class="btn g" id="exp">Exportar CSV</button><button class="btn g" onclick="print()">Imprimir</button></div><div class="card" id="rs"><p class="mut">Elige un reporte y pulsa Generar.</p></div>`;
+ let R;const sync=()=>$('#fl').style.display=$('#rk').selectedOptions[0].dataset.f==='1'?'':'none';$('#rk').onchange=sync;sync();
+ $('#gen').onclick=async()=>{try{R=await api(`/api/report/${$('#rk').value}?desde=${$('#d1').value}&hasta=${$('#d2').value}`);
+  $('#rs').innerHTML=`<h3>${$('#rk').selectedOptions[0].text}</h3>`+tabla(R.cols,R.rows)+`<p class="mut">${R.rows.length} fila(s) · generado ${new Date().toLocaleString()}</p>`}catch(e){toast(e.message)}};
+ $('#exp').onclick=()=>R?csv(R.cols,R.rows,$('#rk').value):toast('Genera el reporte primero')}
+
+// ---------- DICCIONARIO
+function dic(){$('#main').innerHTML=`<h2>Diccionario de datos</h2><div class="bar2 noprint"><input id="ds" placeholder="Filtrar tabla o campo…"><button class="btn g" onclick="print()">Imprimir</button></div><div id="dl"></div>`;
+ const draw=()=>{const f=$('#ds').value.toLowerCase();$('#dl').innerHTML=Object.keys(TN).filter(t=>!f||t.includes(f)||META[t].some(c=>c.name.includes(f))).map(t=>`<div class="card"><h3><code>${t}</code> ${TN[t]}</h3><p class="mut">${TD[t]||''}</p>
+  ${tabla(['Campo','Tipo','Nulo','Clave','Por defecto / Referencia'].map((l,i)=>({l,k:i})),META[t].map(c=>({0:c.name,1:c.type,2:c.nullable?'Sí':'No',3:[c.pk&&'PK',c.fk&&'FK',c.unique&&'UQ'].filter(Boolean).join(', '),4:c.fk?`→ ${c.fk.table}(${c.fk.col})`:c.identity?'autonumérico':(c.def||'')})))}</div>`).join('')};
+ $('#ds').oninput=draw;draw()}
+
+// ---------- MODELO ER
+function er(){const K='er_img',img=localStorage.getItem(K);
+ $('#main').innerHTML=`<h2>Modelo entidad-relación</h2><div class="card" id="er">
+ ${img?`<div class="bar2 noprint"><a class="btn g" download="modelo-er.webp" href="${img}">Descargar imagen</a><button class="btn d" id="rm">Quitar imagen</button></div><img src="${img}" alt="Modelo ER">`
+ :`<div class="bar2 noprint"><input type="file" id="fi" accept="image/*"></div><p class="mut">Aún no hay imagen. Sube un PNG, JPG o WebP de tu diagrama ER.</p>`}
+ <p class="mut noprint">La imagen se guarda en este navegador.</p></div>`;
+ if(img){$('#rm').onclick=()=>{if(confirm('¿Quitar la imagen del modelo ER?')){localStorage.removeItem(K);er()}};return}
+ $('#fi').onchange=e=>{const f=e.target.files[0];if(!f)return;const i=new Image();i.onload=()=>{const s=Math.min(1,2000/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);
+  try{localStorage.setItem(K,c.toDataURL('image/webp',.92));er()}catch{toast('La imagen es demasiado grande para guardarla')}};i.src=URL.createObjectURL(f)}}
+go('dash');
+</script></body></html>
